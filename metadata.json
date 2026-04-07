@@ -1,0 +1,5 @@
+{
+  "name": "BS TryFit",
+  "description": "AI-powered outfit try-on tool. Upload your photo and try on different outfits instantly using Gemini AI.",
+  "requestFramePermissions": []
+}
