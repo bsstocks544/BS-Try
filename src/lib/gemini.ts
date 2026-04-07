@@ -16,6 +16,49 @@ export interface TryOnParams {
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
+ * Resizes a base64 image to a maximum dimension while maintaining aspect ratio.
+ * This helps stay within Gemini API token limits.
+ */
+async function resizeImage(base64: string, mimeType: string, maxDim = 768): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > maxDim) {
+          height *= maxDim / width;
+          width = maxDim;
+        }
+      } else {
+        if (height > maxDim) {
+          width *= maxDim / height;
+          height = maxDim;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      
+      // Fill with white background for transparency support (e.g. PNG to JPEG)
+      if (ctx) {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+      }
+      
+      // Use lower quality (0.7) to significantly save tokens
+      const resizedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+      resolve(resizedBase64.split(',')[1]);
+    };
+    img.src = `data:${mimeType};base64,${base64}`;
+  });
+}
+
+/**
  * Generates a try-on image using Gemini AI with retry logic for quota errors.
  */
 export async function generateTryOn(
@@ -25,6 +68,13 @@ export async function generateTryOn(
 ): Promise<string> {
   const { userImageBase64, userImageMimeType, outfitDescription, outfitImageBase64, outfitImageMimeType } = params;
 
+  // Resize images to save tokens and stay within free tier limits
+  const resizedUserImage = await resizeImage(userImageBase64, userImageMimeType);
+  let resizedOutfitImage = outfitImageBase64;
+  if (outfitImageBase64 && outfitImageMimeType) {
+    resizedOutfitImage = await resizeImage(outfitImageBase64, outfitImageMimeType);
+  }
+
   const prompt = `Edit this image by changing only the outfit to ${outfitDescription}. 
 Keep the person's face, pose, body proportions, background, lighting, and camera angle exactly the same. 
 Do not alter identity or scene. Photorealistic, high quality.`;
@@ -32,8 +82,8 @@ Do not alter identity or scene. Photorealistic, high quality.`;
   const parts: any[] = [
     {
       inlineData: {
-        data: userImageBase64,
-        mimeType: userImageMimeType,
+        data: resizedUserImage,
+        mimeType: 'image/jpeg',
       },
     },
     {
@@ -41,11 +91,11 @@ Do not alter identity or scene. Photorealistic, high quality.`;
     },
   ];
 
-  if (outfitImageBase64 && outfitImageMimeType) {
+  if (resizedOutfitImage && outfitImageMimeType) {
     parts.push({
       inlineData: {
-        data: outfitImageBase64,
-        mimeType: outfitImageMimeType,
+        data: resizedOutfitImage,
+        mimeType: 'image/jpeg',
       },
     });
     parts.push({
