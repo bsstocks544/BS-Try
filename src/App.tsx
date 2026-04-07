@@ -43,6 +43,7 @@ export default function App() {
   const [customPrompt, setCustomPrompt] = useState('');
   const [customOutfitImage, setCustomOutfitImage] = useState<{ base64: string; mimeType: string } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generatingMessage, setGeneratingMessage] = useState('AI is crafting your look...');
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'Presets' | 'Custom' | 'Prompt'>('Presets');
@@ -69,6 +70,7 @@ export default function App() {
     }
 
     setIsGenerating(true);
+    setGeneratingMessage('AI is crafting your look...');
     setError(null);
 
     try {
@@ -76,13 +78,19 @@ export default function App() {
         ? selectedStyle.description 
         : customPrompt || "a stylish outfit";
 
-      const result = await generateTryOn({
-        userImageBase64: userImage.base64,
-        userImageMimeType: userImage.mimeType,
-        outfitDescription,
-        outfitImageBase64: customOutfitImage?.base64,
-        outfitImageMimeType: customOutfitImage?.mimeType
-      });
+      const result = await generateTryOn(
+        {
+          userImageBase64: userImage.base64,
+          userImageMimeType: userImage.mimeType,
+          outfitDescription,
+          outfitImageBase64: customOutfitImage?.base64,
+          outfitImageMimeType: customOutfitImage?.mimeType
+        },
+        0,
+        (seconds) => {
+          setGeneratingMessage(`AI is busy (Free Tier). Retrying in ${seconds}s...`);
+        }
+      );
 
       setResultImage(result);
       setGenCount(prev => prev + 1);
@@ -318,9 +326,9 @@ export default function App() {
             {/* Preview Area */}
             <div className="bg-[#0a0f25] rounded-3xl border border-gray-800 aspect-[3/4] max-h-[700px] flex flex-col items-center justify-center p-4 relative overflow-hidden mx-auto w-full">
               {isGenerating ? (
-                <div className="flex flex-col items-center gap-4">
+                <div className="flex flex-col items-center gap-4 text-center px-4">
                   <div className="w-16 h-16 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin" />
-                  <p className="text-gray-400 font-medium">AI is crafting your look...</p>
+                  <p className="text-gray-400 font-medium">{generatingMessage}</p>
                 </div>
               ) : resultImage && userImage ? (
                 <div className="w-full h-full">
