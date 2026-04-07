@@ -46,6 +46,8 @@ export default function App() {
   const [generatingMessage, setGeneratingMessage] = useState('AI is crafting your look...');
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [showQuotaHelp, setShowQuotaHelp] = useState(false);
   const [activeTab, setActiveTab] = useState<'Presets' | 'Custom' | 'Prompt'>('Presets');
   const [genCount, setGenCount] = useState(0);
 
@@ -73,6 +75,16 @@ export default function App() {
     setGeneratingMessage('AI is crafting your look...');
     setError(null);
 
+    // Demo Mode Logic
+    if (isDemoMode) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      setResultImage("https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=1000");
+      setGenCount(prev => prev + 1);
+      setStep(3);
+      setIsGenerating(false);
+      return;
+    }
+
     try {
       const outfitDescription = selectedStyle 
         ? selectedStyle.description 
@@ -96,6 +108,10 @@ export default function App() {
       setGenCount(prev => prev + 1);
       setStep(3);
     } catch (err: any) {
+      const errorMessage = err.message || "";
+      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("limit")) {
+        setShowQuotaHelp(true);
+      }
       setError(err.message || "Failed to generate. Please try again.");
     } finally {
       setIsGenerating(false);
@@ -294,11 +310,42 @@ export default function App() {
 
             {/* Error Message */}
             {error && (
-              <div className="p-4 bg-red-900/20 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-400">
-                <AlertCircle size={20} />
-                <p className="text-sm font-medium">{error}</p>
+              <div className="bg-red-900/20 border border-red-500/50 p-4 rounded-2xl mb-6">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-red-200 text-sm font-medium">{error}</p>
+                    {showQuotaHelp && (
+                      <button 
+                        onClick={() => setShowQuotaHelp(true)}
+                        className="text-red-400 text-xs underline mt-2 hover:text-red-300 transition-colors"
+                      >
+                        Why am I seeing this? (Quota Help)
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
+
+            {/* Demo Mode Toggle */}
+            <div className="flex items-center justify-between bg-blue-600/10 border border-blue-500/30 p-4 rounded-2xl mb-8">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-600 rounded-lg">
+                  <Sparkles className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-white font-medium text-sm">Demo Mode</h3>
+                  <p className="text-blue-300/70 text-xs">Skip AI limits and see instant results</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsDemoMode(!isDemoMode)}
+                className={`w-12 h-6 rounded-full transition-colors relative ${isDemoMode ? 'bg-blue-600' : 'bg-gray-700'}`}
+              >
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${isDemoMode ? 'left-7' : 'left-1'}`} />
+              </button>
+            </div>
 
             {/* Generate Button */}
             <button
@@ -370,6 +417,42 @@ export default function App() {
         {/* Bottom Ad */}
         <AdPlaceholder type="horizontal" label="Bottom Banner Ad" className="mt-12" />
       </main>
+
+      {/* Quota Help Modal */}
+      {showQuotaHelp && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#0f172a] border border-gray-800 rounded-3xl p-8 max-w-md w-full shadow-2xl">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-yellow-500/20 rounded-xl">
+                <AlertCircle className="w-6 h-6 text-yellow-500" />
+              </div>
+              <h2 className="text-xl font-bold text-white">Quota Help</h2>
+            </div>
+            
+            <div className="space-y-4 text-gray-300 text-sm leading-relaxed">
+              <p>
+                The <span className="text-white font-semibold">Gemini Free Tier</span> has strict limits. If you see "Limit: 0", it means your project's daily quota is exhausted.
+              </p>
+              
+              <div className="bg-gray-800/50 p-4 rounded-xl space-y-3">
+                <h3 className="text-white font-semibold text-xs uppercase tracking-wider">How to fix:</h3>
+                <ul className="list-disc list-inside space-y-2">
+                  <li><span className="text-blue-400">Enable Billing:</span> Adding a payment method (even if you stay free) usually removes the "0 limit" restriction.</li>
+                  <li><span className="text-blue-400">New API Key:</span> Create a fresh project in Google AI Studio for a new quota.</li>
+                  <li><span className="text-blue-400">Use Demo Mode:</span> Toggle "Demo Mode" above to test the app without using the API.</li>
+                </ul>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => setShowQuotaHelp(false)}
+              className="w-full mt-8 py-3 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-colors"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="py-12 border-t border-gray-800/50 text-center">
